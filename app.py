@@ -127,7 +127,7 @@ with col_logo:
 with col_title:
 
     st.markdown(
-        '<div class="big-title">🔥 Motilal Oswal Midcap Fund NAV Tracker</div>',
+        '<div class="big-title"> Invesco India Midcap Fund NAV Tracker</div>',
         unsafe_allow_html=True
     )
 
