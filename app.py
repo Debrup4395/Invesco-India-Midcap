@@ -20,7 +20,7 @@ st_autorefresh(interval=5000, key="refresh")
 # =========================
 
 st.set_page_config(
-    page_title="Motilal Oswal Midcap Fund NAV Tracker",
+    page_title="Invesco India Midcap Fund NAV Tracker",
     layout="wide"
 )
 
