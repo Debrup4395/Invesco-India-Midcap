@@ -190,7 +190,6 @@ investment_duration = (
 
 stocks = [
 
-    stocks = [
     ("BSE", 6.05),
     ("PRESTIGE", 5.85),
     ("FEDERALBNK", 5.20),
