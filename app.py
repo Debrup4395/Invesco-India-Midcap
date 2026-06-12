@@ -548,7 +548,7 @@ message_content += "\n🔻 Top 5 Losers:\n"
 for idx, (_, row) in enumerate(top_losers.head(5).iterrows(), 1):
     message_content += f"{idx}. {row['Stock']} - {row['% Change']:.2f}%\n"
 
-message_content += "\n© Debrup Bera | Motilal Oswal Midcap Fund Tracker"
+message_content += "\n© Debrup Bera | Invesco India Midcap Fund Tracker"
 
 # Display the message preview
 with st.expander("📝 Preview Message", expanded=False):
@@ -635,7 +635,7 @@ if send_email_btn:
         st.error("⚠️ Please fill in all email fields!")
     else:
         with st.spinner("Sending email..."):
-            subject = f"Motilal Oswal Midcap Fund Update - {datetime.now().strftime('%d %b %Y')}"
+            subject = f"Invesco India Midcap Fund Update - {datetime.now().strftime('%d %b %Y')}"
             success, message = send_email(sender_email, sender_password, recipient_email, 
                                          subject, message_content)
             
