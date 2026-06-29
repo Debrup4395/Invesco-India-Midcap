@@ -145,8 +145,8 @@ with col_title:
 # MANUAL NAV UPDATE
 # =========================
 
-previous_nav = 235.95
-weekly_start_nav = 234.86
+previous_nav = 235.25
+weekly_start_nav = 235.95
 
 # =========================
 # INVESTMENT DETAILS
