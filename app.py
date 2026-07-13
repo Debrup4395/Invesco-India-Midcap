@@ -189,8 +189,7 @@ investment_duration = (
 # =========================
 
 stocks = [
-
-    holdings  [
+    
     ("PRESTIGE", 7.09),
     ("FEDERALBNK", 5.58),
     ("BSE", 5.08),
