@@ -236,7 +236,6 @@ stocks = [
     ("TIINDIA", 0.14),
 ]
     
-]
 
 # =========================
 # FETCH LIVE DATA
