@@ -10,7 +10,7 @@ from email.mime.multipart import MIMEMultipart
 import urllib.parse
 
 # =========================
-# AUTO REFRESH EVERY 05 SEC
+# AUTO REFRESH EVERY 5 SEC (UI only — data fetch is cached, see below)
 # =========================
 
 st_autorefresh(interval=5000, key="refresh")
@@ -189,7 +189,7 @@ investment_duration = (
 # =========================
 
 stocks = [
-    
+
     ("PRESTIGE", 7.09),
     ("FEDERALBNK", 5.58),
     ("BSE", 5.08),
@@ -235,61 +235,80 @@ stocks = [
     ("VMM", 0.22),
     ("TIINDIA", 0.14),
 ]
-    
+
 
 # =========================
-# FETCH LIVE DATA
+# FETCH LIVE DATA (BATCHED + CACHED)
 # =========================
+# Key fix #1: one batched yf.download() call instead of 44 separate
+#             yf.Ticker().history() calls (each is its own network round trip).
+# Key fix #2: @st.cache_data so the 5-second UI refresh doesn't re-hit
+#             Yahoo Finance every rerun — only every `ttl` seconds.
+#             Adjust ttl below to taste (30-60s is plenty for this kind of data).
+
+@st.cache_data(ttl=30, show_spinner=False)
+def fetch_all_prices(symbol_list):
+    tickers = [s + ".NS" for s in symbol_list]
+
+    data = yf.download(
+        tickers=tickers,
+        period="5d",
+        interval="1d",
+        group_by="ticker",
+        threads=True,
+        progress=False,
+        auto_adjust=False,
+    )
+
+    results = {}
+
+    for symbol in symbol_list:
+        ticker = symbol + ".NS"
+        try:
+            if len(symbol_list) > 1:
+                hist = data[ticker]
+            else:
+                hist = data
+
+            hist = hist.dropna(subset=["Close"])
+            prev_close = hist["Close"].iloc[-2]
+            live_price = hist["Close"].iloc[-1]
+
+            results[symbol] = (
+                round(float(prev_close), 2),
+                round(float(live_price), 2),
+            )
+        except Exception:
+            results[symbol] = (0, 0)
+
+    return results
+
+
+symbol_list = [s for s, _ in stocks]
+price_data = fetch_all_prices(symbol_list)
 
 rows = []
-
 total_weighted_return = 0
 
 for symbol, weight in stocks:
 
-    ticker = symbol + ".NS"
+    prev_close, live_price = price_data.get(symbol, (0, 0))
 
-    try:
+    if prev_close:
+        change_pct = ((live_price - prev_close) / prev_close) * 100
+    else:
+        change_pct = 0
 
-        stock = yf.Ticker(ticker)
+    weighted_return = (change_pct * weight) / 100
+    total_weighted_return += weighted_return
 
-        hist = stock.history(period="5d", interval="1d")
-
-        prev_close = hist["Close"].iloc[-2]
-        live_price = hist["Close"].iloc[-1]
-
-        change_pct = (
-            (live_price - prev_close)
-            / prev_close
-        ) * 100
-
-        weighted_return = (
-            change_pct * weight
-        ) / 100
-
-        total_weighted_return += weighted_return
-
-        rows.append([
-
-            symbol,
-            round(weight, 2),
-            round(prev_close, 2),
-            round(live_price, 2),
-            round(change_pct, 2)
-
-        ])
-
-    except:
-
-        rows.append([
-
-            symbol,
-            weight,
-            0,
-            0,
-            0
-
-        ])
+    rows.append([
+        symbol,
+        round(weight, 2),
+        prev_close,
+        live_price,
+        round(change_pct, 2)
+    ])
 
 # =========================
 # DATAFRAME
@@ -558,15 +577,15 @@ col_email, col_phone = st.columns(2)
 with col_email:
     st.markdown("#### 📧 Send via Email")
     recipient_email = st.text_input("Recipient Email", placeholder="example@gmail.com")
-    
+
     # Email configuration (You need to set these in Streamlit secrets or environment variables)
     sender_email = st.text_input("Your Email (Gmail)", placeholder="your-email@gmail.com")
-    sender_password = st.text_input("App Password", type="password", 
+    sender_password = st.text_input("App Password", type="password",
                                    help="Use Gmail App Password, not your regular password")
 
 with col_phone:
     st.markdown("#### 📱 Send via WhatsApp")
-    phone_number = st.text_input("Phone Number (with country code)", 
+    phone_number = st.text_input("Phone Number (with country code)",
                                  placeholder="+911234567890",
                                  help="Format: +91XXXXXXXXXX (India)")
 
@@ -590,21 +609,21 @@ def send_email(sender, password, recipient, subject, body):
         msg['From'] = sender
         msg['To'] = recipient
         msg['Subject'] = subject
-        
+
         msg.attach(MIMEText(body, 'plain'))
-        
+
         # Connect to Gmail SMTP server
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
         server.login(sender, password)
-        
+
         # Send email
         text = msg.as_string()
         server.sendmail(sender, recipient, text)
         server.quit()
-        
+
         return True, "Email sent successfully! ✅"
-    
+
     except Exception as e:
         return False, f"Failed to send email: {str(e)}"
 
@@ -615,13 +634,13 @@ def send_email(sender, password, recipient, subject, body):
 def generate_whatsapp_link(phone, message):
     # Remove '+' and any spaces from phone number
     clean_phone = phone.replace('+', '').replace(' ', '').replace('-', '')
-    
+
     # URL encode the message
     encoded_message = urllib.parse.quote(message)
-    
+
     # Generate WhatsApp link
     whatsapp_url = f"https://wa.me/{clean_phone}?text={encoded_message}"
-    
+
     return whatsapp_url
 
 # =========================
@@ -634,9 +653,9 @@ if send_email_btn:
     else:
         with st.spinner("Sending email..."):
             subject = f"Invesco India Midcap Fund Update - {datetime.now().strftime('%d %b %Y')}"
-            success, message = send_email(sender_email, sender_password, recipient_email, 
+            success, message = send_email(sender_email, sender_password, recipient_email,
                                          subject, message_content)
-            
+
             if success:
                 st.success(message)
             else:
