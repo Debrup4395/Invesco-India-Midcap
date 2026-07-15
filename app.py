@@ -246,7 +246,7 @@ stocks = [
 #             Yahoo Finance every rerun — only every `ttl` seconds.
 #             Adjust ttl below to taste (30-60s is plenty for this kind of data).
 
-@st.cache_data(ttl=30, show_spinner=False)
+@st.cache_data(ttl=5, show_spinner=False)
 def fetch_all_prices(symbol_list):
     tickers = [s + ".NS" for s in symbol_list]
 
