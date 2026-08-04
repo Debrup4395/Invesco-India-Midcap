@@ -238,77 +238,143 @@ stocks = [
 
 
 # =========================
-# FETCH LIVE DATA (BATCHED + CACHED)
+# FETCH LIVE DATA (fast_info primary + batched-download fallback)
 # =========================
-# Key fix #1: one batched yf.download() call instead of 44 separate
-#             yf.Ticker().history() calls (each is its own network round trip).
-# Key fix #2: @st.cache_data so the 5-second UI refresh doesn't re-hit
-#             Yahoo Finance every rerun — only every `ttl` seconds.
-#             Adjust ttl below to taste (30-60s is plenty for this kind of data).
+#
+# WHY THE OLD VERSION SHOWED WRONG PRICES / WRONG % CHANGE:
+# Both "Previous Close" and "Live Price" were pulled from the SAME
+# batched yf.download() daily-bar table via iloc[-2] / iloc[-1]. That
+# sounds consistent, but early in the trading session Yahoo's daily bar
+# for TODAY often doesn't exist yet in that download response. When
+# that happens, iloc[-1] silently becomes YESTERDAY's close (not live)
+# and iloc[-2] becomes the close from TWO days ago -- both numbers are
+# stale, and any live price computed off them (or shown elsewhere) can
+# be wrong, sometimes even the wrong direction.
+#
+# FIX: pull BOTH previous close and live price from a single fast_info
+# snapshot per ticker -- fast_info.previous_close is Yahoo's own live
+# "last completed session" reference price and fast_info.last_price is
+# the true current quote, so the two numbers can never desync from each
+# other the way two different daily bars could. The batched daily-bar
+# download is kept ONLY as a last-resort fallback for any symbol where
+# fast_info returns nothing (e.g. a transient network hiccup).
+#
+# Symbols that fail on BOTH sources reuse their last known good values
+# (kept in st.session_state) instead of collapsing to 0, so the NAV
+# math and the table don't silently go wrong for one bad symbol.
+
+if "last_good_data" not in st.session_state:
+    st.session_state["last_good_data"] = {}
+
 
 @st.cache_data(ttl=5, show_spinner=False)
-def fetch_all_prices(symbol_list):
+def fetch_batch_fallback(symbol_list):
+    """Fallback-only daily bar data, used solely when fast_info fails
+    for a symbol. Wider window (10d) guards against holidays/weekends
+    leaving fewer than 2 valid bars."""
     tickers = [s + ".NS" for s in symbol_list]
+    try:
+        return yf.download(
+            tickers=tickers,
+            period="10d",
+            interval="1d",
+            group_by="ticker",
+            threads=True,
+            progress=False,
+            auto_adjust=False,
+        )
+    except Exception:
+        return pd.DataFrame()
 
-    data = yf.download(
-        tickers=tickers,
-        period="5d",
-        interval="1d",
-        group_by="ticker",
-        threads=True,
-        progress=False,
-        auto_adjust=False,
-    )
 
-    results = {}
+@st.cache_data(ttl=5, show_spinner=False)
+def get_quote(ticker):
+    """Primary source: previous close AND live price from the SAME
+    live-quote snapshot, so they can never desync from each other."""
+    try:
+        fi = yf.Ticker(ticker).fast_info
+        live_price = fi.get("last_price") or fi.get("lastPrice")
+        prev_close = (
+            fi.get("previous_close")
+            or fi.get("previousClose")
+            or fi.get("regular_market_previous_close")
+        )
+        if live_price and prev_close:
+            return round(float(prev_close), 2), round(float(live_price), 2)
+    except Exception:
+        pass
+    return None, None
 
-    for symbol in symbol_list:
-        ticker = symbol + ".NS"
-        try:
-            if len(symbol_list) > 1:
-                hist = data[ticker]
-            else:
-                hist = data
 
-            hist = hist.dropna(subset=["Close"])
-            prev_close = hist["Close"].iloc[-2]
-            live_price = hist["Close"].iloc[-1]
+def get_fallback_prices(ticker, batch_data):
+    """Last-resort fallback if fast_info gave nothing for this ticker."""
+    try:
+        if isinstance(batch_data.columns, pd.MultiIndex):
+            hist = batch_data[ticker]["Close"].dropna()
+        else:
+            hist = batch_data["Close"].dropna()
 
-            results[symbol] = (
-                round(float(prev_close), 2),
-                round(float(live_price), 2),
-            )
-        except Exception:
-            results[symbol] = (0, 0)
-
-    return results
+        if len(hist) >= 2:
+            return round(float(hist.iloc[-2]), 2), round(float(hist.iloc[-1]), 2)
+        elif len(hist) == 1:
+            v = round(float(hist.iloc[-1]), 2)
+            return v, v
+    except Exception:
+        pass
+    return None, None
 
 
 symbol_list = [s for s, _ in stocks]
-price_data = fetch_all_prices(symbol_list)
 
 rows = []
 total_weighted_return = 0
 
+# Only fetch the fallback batch if we actually end up needing it
+batch_data = None
+
 for symbol, weight in stocks:
 
-    prev_close, live_price = price_data.get(symbol, (0, 0))
+    ticker = symbol + ".NS"
 
-    if prev_close:
-        change_pct = ((live_price - prev_close) / prev_close) * 100
+    prev_close, live_price = get_quote(ticker)
+
+    if prev_close is None or live_price is None:
+        if batch_data is None:
+            batch_data = fetch_batch_fallback(symbol_list)
+        fb_prev, fb_live = get_fallback_prices(ticker, batch_data)
+        prev_close = prev_close if prev_close is not None else fb_prev
+        live_price = live_price if live_price is not None else fb_live
+
+    if prev_close is not None and live_price is not None:
+        # Good data this refresh -> compute and remember it
+        change_pct = ((live_price - prev_close) / prev_close) * 100 if prev_close else 0
+        weighted_return = (change_pct * weight) / 100
+        total_weighted_return += weighted_return
+
+        row = [
+            symbol,
+            round(weight, 2),
+            prev_close,
+            live_price,
+            round(change_pct, 2),
+        ]
+
+        st.session_state["last_good_data"][symbol] = row
+
     else:
-        change_pct = 0
+        # No fresh data at all this refresh -> reuse last known good
+        # values instead of collapsing to 0
+        cached_row = st.session_state["last_good_data"].get(symbol)
 
-    weighted_return = (change_pct * weight) / 100
-    total_weighted_return += weighted_return
+        if cached_row is not None:
+            row = cached_row
+            cached_change_pct = row[4]
+            weighted_return = (cached_change_pct * weight) / 100
+            total_weighted_return += weighted_return
+        else:
+            row = [symbol, weight, 0, 0, 0]
 
-    rows.append([
-        symbol,
-        round(weight, 2),
-        prev_close,
-        live_price,
-        round(change_pct, 2)
-    ])
+    rows.append(row)
 
 # =========================
 # DATAFRAME
