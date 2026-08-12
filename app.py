@@ -232,6 +232,7 @@ stocks = [
     ("AGARWALEYE", 0.73),      # Dr Agarwals Health Care Limited
     ("TIINDIA", 0.68),         # Tube Investments Of India Limited
     ("TIMKEN", 0.58),          # Timken India Limited
+    ("MANIPALHOS", 0.51),      # Manipal Health Enterprises Limited
     ("BANSALWIRE", 0.50),      # Bansal Wire Industries Limited
     ("CARBORUNIV", 0.45),      # Carborundum Universal Limited
     ("WEWORK", 0.44),          # Wework India Management Limited
