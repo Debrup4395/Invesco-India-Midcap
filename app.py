@@ -10,10 +10,18 @@ from email.mime.multipart import MIMEMultipart
 import urllib.parse
 
 # =========================
-# AUTO REFRESH EVERY 5 SEC (UI only — data fetch is cached, see below)
+# AUTO REFRESH
 # =========================
+# NOTE: Was 5000ms (every 5 sec). That meant 40 individual, un-timed-out
+# yfinance calls fired back-to-back, 12x a minute, 24/7 -> Yahoo starts
+# throttling/blocking the app's IP, and any hung request freezes the
+# whole page (which matches "stuck since morning" after multiple reboots
+# -- the reboot doesn't help because it instantly resumes hammering
+# Yahoo at the same rate). Slowed to 30s, matched to the cache ttl below.
 
-st_autorefresh(interval=10000, key="refresh")
+REFRESH_SECONDS = 30
+
+st_autorefresh(interval=REFRESH_SECONDS * 1000, key="refresh")
 
 # =========================
 # PAGE SETTINGS
@@ -244,76 +252,73 @@ stocks = [
 
 
 # =========================
-# FETCH LIVE DATA (fast_info primary + batched-download fallback)
+# FETCH LIVE DATA (single batched, threaded, timed-out download)
 # =========================
 #
-# WHY THE OLD VERSION SHOWED WRONG PRICES / WRONG % CHANGE:
-# Both "Previous Close" and "Live Price" were pulled from the SAME
-# batched yf.download() daily-bar table via iloc[-2] / iloc[-1]. That
-# sounds consistent, but early in the trading session Yahoo's daily bar
-# for TODAY often doesn't exist yet in that download response. When
-# that happens, iloc[-1] silently becomes YESTERDAY's close (not live)
-# and iloc[-2] becomes the close from TWO days ago -- both numbers are
-# stale, and any live price computed off them (or shown elsewhere) can
-# be wrong, sometimes even the wrong direction.
+# WHY THE OLD VERSION FROZE:
+# It called yf.Ticker(ticker).fast_info ONE TICKER AT A TIME, in a plain
+# for-loop, 40 times, every single autorefresh -- with no timeout. A
+# single slow/unresponsive Yahoo request stalls that iteration, and with
+# no timeout Python just waits. Combined with a 5-second autorefresh,
+# that's 40 un-timed-out requests fired back-to-back roughly every 5
+# seconds, all day -- which is enough to get the app's IP throttled by
+# Yahoo, at which point most/all of those calls hang or error, one after
+# another, and the page never finishes rendering past this section.
 #
-# FIX: pull BOTH previous close and live price from a single fast_info
-# snapshot per ticker -- fast_info.previous_close is Yahoo's own live
-# "last completed session" reference price and fast_info.last_price is
-# the true current quote, so the two numbers can never desync from each
-# other the way two different daily bars could. The batched daily-bar
-# download is kept ONLY as a last-resort fallback for any symbol where
-# fast_info returns nothing (e.g. a transient network hiccup).
-#
-# Symbols that fail on BOTH sources reuse their last known good values
-# (kept in st.session_state) instead of collapsing to 0, so the NAV
-# math and the table don't silently go wrong for one bad symbol.
+# FIX:
+#  1. ONE batched, multi-threaded yf.download() call fetches all 40
+#     tickers' recent daily bars together (threads=True), instead of 40
+#     separate blocking calls.
+#  2. That call is wrapped with a hard timeout via concurrent.futures,
+#     so if Yahoo is unresponsive the app moves on after N seconds
+#     instead of hanging indefinitely.
+#  3. Refresh interval + cache ttl are both slowed to REFRESH_SECONDS
+#     (30s) so we're not hammering Yahoo continuously.
+#  4. Symbols with no fresh data this cycle reuse their last known good
+#     values (kept in st.session_state) instead of collapsing to 0, so
+#     one bad symbol doesn't corrupt the NAV math or the table.
+
+import concurrent.futures
+
+FETCH_TIMEOUT_SECONDS = 15
 
 if "last_good_data" not in st.session_state:
     st.session_state["last_good_data"] = {}
 
+symbol_list = [s for s, _ in stocks]
+ticker_list = [s + ".NS" for s in symbol_list]
 
-@st.cache_data(ttl=5, show_spinner=False)
-def fetch_batch_fallback(symbol_list):
-    """Fallback-only daily bar data, used solely when fast_info fails
-    for a symbol. Wider window (10d) guards against holidays/weekends
-    leaving fewer than 2 valid bars."""
-    tickers = [s + ".NS" for s in symbol_list]
+
+def _download_batch(tickers):
+    """Runs in a worker thread; wrapped with a timeout by the caller."""
+    return yf.download(
+        tickers=tickers,
+        period="10d",
+        interval="1d",
+        group_by="ticker",
+        threads=True,
+        progress=False,
+        auto_adjust=False,
+    )
+
+
+@st.cache_data(ttl=REFRESH_SECONDS, show_spinner=False)
+def fetch_all_prices(tickers):
+    """One batched, threaded call for ALL tickers, with a hard timeout.
+    Returns a DataFrame (possibly empty if the fetch failed/timed out)."""
     try:
-        return yf.download(
-            tickers=tickers,
-            period="10d",
-            interval="1d",
-            group_by="ticker",
-            threads=True,
-            progress=False,
-            auto_adjust=False,
-        )
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+            future = ex.submit(_download_batch, tickers)
+            return future.result(timeout=FETCH_TIMEOUT_SECONDS)
+    except concurrent.futures.TimeoutError:
+        return pd.DataFrame()
     except Exception:
         return pd.DataFrame()
 
 
-@st.cache_data(ttl=5, show_spinner=False)
-def get_quote(ticker):
-    """Primary source: previous close AND live price from the SAME
-    live-quote snapshot, so they can never desync from each other."""
-    try:
-        fi = yf.Ticker(ticker).fast_info
-        live_price = fi.get("last_price") or fi.get("lastPrice")
-        prev_close = (
-            fi.get("previous_close")
-            or fi.get("previousClose")
-            or fi.get("regular_market_previous_close")
-        )
-        if live_price and prev_close:
-            return round(float(prev_close), 2), round(float(live_price), 2)
-    except Exception:
-        pass
-    return None, None
-
-
-def get_fallback_prices(ticker, batch_data):
-    """Last-resort fallback if fast_info gave nothing for this ticker."""
+def get_prices_from_batch(ticker, batch_data):
+    """Pull (previous_close, live_price) for one ticker out of the
+    already-fetched batch DataFrame."""
     try:
         if isinstance(batch_data.columns, pd.MultiIndex):
             hist = batch_data[ticker]["Close"].dropna()
@@ -330,26 +335,20 @@ def get_fallback_prices(ticker, batch_data):
     return None, None
 
 
-symbol_list = [s for s, _ in stocks]
+batch_data = fetch_all_prices(ticker_list)
+
+fetch_failed = batch_data is None or batch_data.empty
 
 rows = []
 total_weighted_return = 0
-
-# Only fetch the fallback batch if we actually end up needing it
-batch_data = None
 
 for symbol, weight in stocks:
 
     ticker = symbol + ".NS"
 
-    prev_close, live_price = get_quote(ticker)
-
-    if prev_close is None or live_price is None:
-        if batch_data is None:
-            batch_data = fetch_batch_fallback(symbol_list)
-        fb_prev, fb_live = get_fallback_prices(ticker, batch_data)
-        prev_close = prev_close if prev_close is not None else fb_prev
-        live_price = live_price if live_price is not None else fb_live
+    prev_close, live_price = (None, None)
+    if not fetch_failed:
+        prev_close, live_price = get_prices_from_batch(ticker, batch_data)
 
     if prev_close is not None and live_price is not None:
         # Good data this refresh -> compute and remember it
@@ -368,8 +367,8 @@ for symbol, weight in stocks:
         st.session_state["last_good_data"][symbol] = row
 
     else:
-        # No fresh data at all this refresh -> reuse last known good
-        # values instead of collapsing to 0
+        # No fresh data this refresh -> reuse last known good values
+        # instead of collapsing to 0
         cached_row = st.session_state["last_good_data"].get(symbol)
 
         if cached_row is not None:
@@ -381,6 +380,14 @@ for symbol, weight in stocks:
             row = [symbol, weight, 0, 0, 0]
 
     rows.append(row)
+
+if fetch_failed:
+    st.warning(
+        "⚠️ Couldn't reach Yahoo Finance this refresh "
+        f"(timed out after {FETCH_TIMEOUT_SECONDS}s or request failed). "
+        "Showing last known values.",
+        icon="⚠️",
+    )
 
 # =========================
 # DATAFRAME
@@ -763,4 +770,4 @@ st.dataframe(
 
 st.markdown("---")
 
-st.caption("© Debrup Bera | Auto-refresh every 05 seconds")
+st.caption(f"© Debrup Bera | Auto-refresh every {REFRESH_SECONDS} seconds")
