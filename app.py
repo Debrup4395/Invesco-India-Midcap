@@ -19,7 +19,7 @@ import urllib.parse
 # -- the reboot doesn't help because it instantly resumes hammering
 # Yahoo at the same rate). Slowed to 30s, matched to the cache ttl below.
 
-REFRESH_SECONDS = 30
+REFRESH_SECONDS = 10
 
 st_autorefresh(interval=REFRESH_SECONDS * 1000, key="refresh")
 
