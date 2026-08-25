@@ -13,7 +13,7 @@ import urllib.parse
 # AUTO REFRESH EVERY 5 SEC (UI only — data fetch is cached, see below)
 # =========================
 
-st_autorefresh(interval=5000, key="refresh")
+st_autorefresh(interval=10000, key="refresh")
 
 # =========================
 # PAGE SETTINGS
