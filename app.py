@@ -2,23 +2,17 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 from streamlit_autorefresh import st_autorefresh
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import urllib.parse
+import concurrent.futures
 
 # =========================
 # AUTO REFRESH
 # =========================
-# NOTE: Was 5000ms (every 5 sec). That meant 40 individual, un-timed-out
-# yfinance calls fired back-to-back, 12x a minute, 24/7 -> Yahoo starts
-# throttling/blocking the app's IP, and any hung request freezes the
-# whole page (which matches "stuck since morning" after multiple reboots
-# -- the reboot doesn't help because it instantly resumes hammering
-# Yahoo at the same rate). Slowed to 30s, matched to the cache ttl below.
-
 REFRESH_SECONDS = 10
 
 st_autorefresh(interval=REFRESH_SECONDS * 1000, key="refresh")
@@ -112,6 +106,16 @@ div[data-testid="metric-container"] label {
     font-weight: bold;
 }
 
+.stale-badge {
+    background: rgba(239,68,68,0.15);
+    border: 1px solid rgba(239,68,68,0.4);
+    color: #fca5a5;
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    margin-bottom: 10px;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -119,9 +123,9 @@ div[data-testid="metric-container"] label {
 # INDIAN TIME
 # =========================
 
-india_time = datetime.now(
-    ZoneInfo("Asia/Kolkata")
-).strftime("%d %b %Y | %I:%M:%S %p")
+now_ist = datetime.now(ZoneInfo("Asia/Kolkata"))
+india_time = now_ist.strftime("%d %b %Y | %I:%M:%S %p")
+today_ist_date = now_ist.date()
 
 # =========================
 # LOGO + TITLE
@@ -255,35 +259,36 @@ stocks = [
 # FETCH LIVE DATA (single batched, threaded, timed-out download)
 # =========================
 #
-# WHY THE OLD VERSION FROZE:
-# It called yf.Ticker(ticker).fast_info ONE TICKER AT A TIME, in a plain
-# for-loop, 40 times, every single autorefresh -- with no timeout. A
-# single slow/unresponsive Yahoo request stalls that iteration, and with
-# no timeout Python just waits. Combined with a 5-second autorefresh,
-# that's 40 un-timed-out requests fired back-to-back roughly every 5
-# seconds, all day -- which is enough to get the app's IP throttled by
-# Yahoo, at which point most/all of those calls hang or error, one after
-# another, and the page never finishes rendering past this section.
+# WHY PREVIOUS CLOSES WERE SHOWING AS 3 DAYS OLD:
+# Inside one batched yf.download() call for 40 tickers, if Yahoo
+# throttles/fails a SUBSET of those tickers (common under sustained
+# load), yfinance doesn't raise an error for the whole batch -- it just
+# fills that ticker's recent rows with NaN. The old code did
+# `.dropna()` per ticker and then blindly grabbed iloc[-2] / iloc[-1].
+# If a ticker's last 2-3 days came back NaN, dropna() silently removed
+# them, and iloc[-2]/iloc[-1] landed on genuinely old data -- which was
+# then displayed and used in NAV math as if it were live/previous-day
+# data. The existing "reuse last known good value" fallback never
+# triggered for this case because a value (just a stale one) was always
+# returned.
 #
-# FIX:
-#  1. ONE batched, multi-threaded yf.download() call fetches all 40
-#     tickers' recent daily bars together (threads=True), instead of 40
-#     separate blocking calls.
-#  2. That call is wrapped with a hard timeout via concurrent.futures,
-#     so if Yahoo is unresponsive the app moves on after N seconds
-#     instead of hanging indefinitely.
-#  3. Refresh interval + cache ttl are both slowed to REFRESH_SECONDS
-#     (30s) so we're not hammering Yahoo continuously.
-#  4. Symbols with no fresh data this cycle reuse their last known good
-#     values (kept in st.session_state) instead of collapsing to 0, so
-#     one bad symbol doesn't corrupt the NAV math or the table.
-
-import concurrent.futures
+# FIX: after extracting the per-ticker Close series, check the ACTUAL
+# DATE of the most recent row. If it's older than STALE_DATA_MAX_DAYS,
+# treat that ticker's fetch as failed for this cycle (return None, None)
+# so it falls through to the existing last-known-good-value cache
+# instead of being displayed as current.
 
 FETCH_TIMEOUT_SECONDS = 15
 
+# Generous enough to cover a long weekend / one-day exchange holiday,
+# tight enough to catch "stuck for days" staleness.
+STALE_DATA_MAX_DAYS = 4
+
 if "last_good_data" not in st.session_state:
     st.session_state["last_good_data"] = {}
+
+if "last_good_asof" not in st.session_state:
+    st.session_state["last_good_asof"] = {}
 
 symbol_list = [s for s, _ in stocks]
 ticker_list = [s + ".NS" for s in symbol_list]
@@ -316,23 +321,41 @@ def fetch_all_prices(tickers):
         return pd.DataFrame()
 
 
-def get_prices_from_batch(ticker, batch_data):
-    """Pull (previous_close, live_price) for one ticker out of the
-    already-fetched batch DataFrame."""
+def get_prices_from_batch(ticker, batch_data, as_of_today):
+    """Pull (previous_close, live_price, as_of_date) for one ticker out of
+    the already-fetched batch DataFrame.
+
+    Returns (None, None, None) if there's no data OR the freshest data
+    point available is older than STALE_DATA_MAX_DAYS -- callers should
+    treat that the same as a failed fetch and fall back to cached values.
+    """
     try:
         if isinstance(batch_data.columns, pd.MultiIndex):
             hist = batch_data[ticker]["Close"].dropna()
         else:
             hist = batch_data["Close"].dropna()
 
+        if len(hist) == 0:
+            return None, None, None
+
+        latest_date = hist.index[-1].date()
+        age_days = (as_of_today - latest_date).days
+
+        if age_days > STALE_DATA_MAX_DAYS:
+            # Data exists but it's too old to trust -- treat as a
+            # failed fetch for this cycle.
+            return None, None, None
+
         if len(hist) >= 2:
-            return round(float(hist.iloc[-2]), 2), round(float(hist.iloc[-1]), 2)
-        elif len(hist) == 1:
-            v = round(float(hist.iloc[-1]), 2)
-            return v, v
+            prev = round(float(hist.iloc[-2]), 2)
+            live = round(float(hist.iloc[-1]), 2)
+        else:
+            prev = live = round(float(hist.iloc[-1]), 2)
+
+        return prev, live, latest_date
+
     except Exception:
-        pass
-    return None, None
+        return None, None, None
 
 
 batch_data = fetch_all_prices(ticker_list)
@@ -341,17 +364,21 @@ fetch_failed = batch_data is None or batch_data.empty
 
 rows = []
 total_weighted_return = 0
+stale_symbols = []       # fell back to cache this cycle
+never_fetched_symbols = []  # no cache to fall back to at all
 
 for symbol, weight in stocks:
 
     ticker = symbol + ".NS"
 
-    prev_close, live_price = (None, None)
+    prev_close, live_price, as_of_date = (None, None, None)
     if not fetch_failed:
-        prev_close, live_price = get_prices_from_batch(ticker, batch_data)
+        prev_close, live_price, as_of_date = get_prices_from_batch(
+            ticker, batch_data, today_ist_date
+        )
 
     if prev_close is not None and live_price is not None:
-        # Good data this refresh -> compute and remember it
+        # Good, fresh data this refresh -> compute and remember it
         change_pct = ((live_price - prev_close) / prev_close) * 100 if prev_close else 0
         weighted_return = (change_pct * weight) / 100
         total_weighted_return += weighted_return
@@ -365,10 +392,12 @@ for symbol, weight in stocks:
         ]
 
         st.session_state["last_good_data"][symbol] = row
+        st.session_state["last_good_asof"][symbol] = as_of_date
 
     else:
-        # No fresh data this refresh -> reuse last known good values
-        # instead of collapsing to 0
+        # No fresh/trustworthy data this refresh -> reuse last known
+        # good values instead of collapsing to 0 or showing stale data
+        # as if it were current.
         cached_row = st.session_state["last_good_data"].get(symbol)
 
         if cached_row is not None:
@@ -376,8 +405,10 @@ for symbol, weight in stocks:
             cached_change_pct = row[4]
             weighted_return = (cached_change_pct * weight) / 100
             total_weighted_return += weighted_return
+            stale_symbols.append(symbol)
         else:
             row = [symbol, weight, 0, 0, 0]
+            never_fetched_symbols.append(symbol)
 
     rows.append(row)
 
@@ -387,6 +418,22 @@ if fetch_failed:
         f"(timed out after {FETCH_TIMEOUT_SECONDS}s or request failed). "
         "Showing last known values.",
         icon="⚠️",
+    )
+elif stale_symbols:
+    preview = ", ".join(stale_symbols[:6])
+    more = f" +{len(stale_symbols) - 6} more" if len(stale_symbols) > 6 else ""
+    st.markdown(
+        f'<div class="stale-badge">⚠️ {len(stale_symbols)} symbol(s) returned '
+        f'data older than {STALE_DATA_MAX_DAYS} days this refresh — showing '
+        f'their last known good values instead: {preview}{more}</div>',
+        unsafe_allow_html=True,
+    )
+
+if never_fetched_symbols:
+    st.info(
+        "ℹ️ No data (fresh or cached) yet for: "
+        + ", ".join(never_fetched_symbols)
+        + ". These show as 0 until a successful fetch comes through."
     )
 
 # =========================
@@ -767,6 +814,19 @@ st.dataframe(
     use_container_width=True,
     height=850
 )
+
+# Small transparency footer so a data-freshness problem is visible
+# immediately instead of showing up as silently wrong numbers.
+if st.session_state["last_good_asof"]:
+    oldest_symbol = min(
+        st.session_state["last_good_asof"],
+        key=lambda s: st.session_state["last_good_asof"][s]
+    )
+    oldest_date = st.session_state["last_good_asof"][oldest_symbol]
+    st.caption(
+        f"Oldest 'Previous Close' data point currently in use: "
+        f"{oldest_symbol} as of {oldest_date.strftime('%d %b %Y')}"
+    )
 
 st.markdown("---")
 
