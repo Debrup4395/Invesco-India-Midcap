@@ -200,57 +200,64 @@ investment_duration = (
 # PORTFOLIO HOLDINGS
 # =========================
 # Updated to Invesco Mutual Fund's Monthly Portfolio Statement as on
-# July 31, 2026 (equity holdings only; weights are "% to Net Assets").
+# AUGUST 31, 2026 (equity holdings only; weights are "% to Net Assets").
 # Excludes TREPS/Reverse Repo and Net Receivables/(Payables) lines
 # (cash-equivalents, not equities).
-# "Manipal Health Enterprises Ltd" (0.51%) is omitted - it is an
-# unlisted company and has no resolvable NSE ticker.
-# "Chola Financial Holdings", "Apar Industries" and "Sobha Ltd" from
-# the prior statement have dropped out of this month's portfolio.
+#
+# Same 41 tickers as the previous (July 31) statement -- nothing
+# dropped, nothing newly added this month. Only weights/ranking moved.
+#
+# Notable mover: Manipal Health Enterprises Ltd (MANIPALHOS) jumped
+# from 0.51% to 4.74%. This is not a data error -- the company IPO'd
+# and began trading on NSE on August 5, 2026 (confirmed via NSE's own
+# listing circular, NSE/CML/75548, symbol MANIPALHOS, ISIN
+# INE459N01021), so the July 31 statement was still carrying it at an
+# unlisted/pre-IPO valuation. The existing MANIPALHOS ticker in this
+# list was already correct and needs no change.
 
 stocks = [
 
-    ("PRESTIGE", 7.16),        # Prestige Estates Projects Limited
-    ("FEDERALBNK", 6.42),      # The Federal Bank Limited
-    ("MAXHEALTH", 6.21),       # Max Healthcare Institute Limited
-    ("MEESHO", 4.64),          # Meesho Ltd
-    ("MEDANTA", 4.37),         # Global Health Limited
-    ("AUBANK", 4.22),          # AU Small Finance Bank Limited
-    ("ETERNAL", 4.18),         # Eternal Limited
-    ("INDUSINDBK", 4.06),      # IndusInd Bank Limited
-    ("BSE", 3.86),             # BSE Limited
-    ("LTF", 3.81),             # L&T Finance Limited
-    ("INDIGO", 3.76),          # InterGlobe Aviation Limited
-    ("MFSL", 3.16),            # Max Financial Services Limited
-    ("SAILIFE", 3.05),         # Sai Life Sciences Limited
-    ("JKCEMENT", 2.93),        # JK Cement Limited
-    ("GLENMARK", 2.83),        # Glenmark Pharmaceuticals Limited
-    ("ABB", 2.55),             # ABB India Limited
-    ("SRF", 2.51),             # SRF Limited
-    ("CPPLUS", 2.33),          # Aditya Infotech Limited
-    ("NYKAA", 2.28),           # FSN E-Commerce Ventures Limited
-    ("TORNTPOWER", 2.23),      # Torrent Power Limited
-    ("TRENT", 2.11),           # Trent Limited
-    ("SWIGGY", 2.08),          # Swiggy Limited
-    ("AMBER", 2.07),           # Amber Enterprises India Limited
-    ("DIXON", 1.48),           # Dixon Technologies (India) Limited
-    ("ICICIGI", 1.47),         # ICICI Lombard General Insurance Company Limited
-    ("BHARATFORG", 1.27),      # Bharat Forge Limited
-    ("PHOENIXLTD", 1.24),      # The Phoenix Mills Limited
-    ("KIMS", 1.06),            # Krishna Institute Of Medical Sciences Limited
-    ("CORONA", 1.00),          # Corona Remedies Limited
-    ("CRAFTSMAN", 0.97),       # Craftsman Automation Limited
-    ("ETHOSLTD", 0.92),        # Ethos Ltd.
+    ("PRESTIGE", 7.27),        # Prestige Estates Projects Limited
+    ("MAXHEALTH", 6.50),       # Max Healthcare Institute Limited
+    ("FEDERALBNK", 5.98),      # The Federal Bank Limited
+    ("MEESHO", 4.84),          # Meesho Ltd
+    ("MANIPALHOS", 4.74),      # Manipal Health Enterprises Limited
+    ("MEDANTA", 4.26),         # Global Health Limited
+    ("ETERNAL", 4.20),         # Eternal Limited
+    ("AUBANK", 4.05),          # AU Small Finance Bank Limited
+    ("LTF", 3.97),             # L&T Finance Limited
+    ("INDUSINDBK", 3.92),      # IndusInd Bank Limited
+    ("BSE", 3.22),             # BSE Limited
+    ("SAILIFE", 3.14),         # Sai Life Sciences Limited
+    ("MFSL", 3.07),            # Max Financial Services Limited
+    ("INDIGO", 3.03),          # InterGlobe Aviation Limited
+    ("GLENMARK", 2.91),        # Glenmark Pharmaceuticals Limited
+    ("ABB", 2.86),             # ABB India Limited
+    ("JKCEMENT", 2.56),        # JK Cement Limited
+    ("SRF", 2.27),             # SRF Limited
+    ("CPPLUS", 2.27),          # Aditya Infotech Limited
+    ("NYKAA", 2.21),           # FSN E-Commerce Ventures Limited
+    ("AMBER", 1.96),           # Amber Enterprises India Limited
+    ("BHARATFORG", 1.85),      # Bharat Forge Limited
+    ("TRENT", 1.77),           # Trent Limited
+    ("TORNTPOWER", 1.77),      # Torrent Power Limited
+    ("SWIGGY", 1.48),          # Swiggy Limited
+    ("DIXON", 1.45),           # Dixon Technologies (India) Limited
+    ("TIINDIA", 1.42),         # Tube Investments Of India Limited
+    ("ICICIGI", 1.31),         # ICICI Lombard General Insurance Company Limited
+    ("PHOENIXLTD", 1.15),      # The Phoenix Mills Limited
+    ("CRAFTSMAN", 1.02),       # Craftsman Automation Limited
+    ("ETHOSLTD", 0.96),        # Ethos Ltd.
+    ("KIMS", 0.92),            # Krishna Institute Of Medical Sciences Limited
+    ("CORONA", 0.90),          # Corona Remedies Limited
     ("AGARWALEYE", 0.73),      # Dr Agarwals Health Care Limited
-    ("TIINDIA", 0.68),         # Tube Investments Of India Limited
-    ("TIMKEN", 0.58),          # Timken India Limited
-    ("MANIPALHOS", 0.51),      # Manipal Health Enterprises Limited
-    ("BANSALWIRE", 0.50),      # Bansal Wire Industries Limited
-    ("CARBORUNIV", 0.45),      # Carborundum Universal Limited
-    ("WEWORK", 0.44),          # Wework India Management Limited
-    ("MAXESTATES", 0.36),      # Max Estates Limited
-    ("SONATSOFTW", 0.33),      # Sonata Software Limited
-    ("VMM", 0.19),             # Vishal Mega Mart Limited
+    ("TIMKEN", 0.54),          # Timken India Limited
+    ("BANSALWIRE", 0.47),      # Bansal Wire Industries Limited
+    ("MAXESTATES", 0.43),      # Max Estates Limited
+    ("WEWORK", 0.37),          # Wework India Management Limited
+    ("VMM", 0.18),             # Vishal Mega Mart Limited
+    ("CARBORUNIV", 0.09),      # Carborundum Universal Limited
+    ("SONATSOFTW", 0.07),      # Sonata Software Limited
 
 ]
 
