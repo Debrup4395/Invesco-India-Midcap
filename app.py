@@ -280,10 +280,13 @@ stocks = [
 #
 #   Tier 1 (primary):   NSE's own quote API (previousClose + lastPrice,
 #                        both authoritative, straight from the exchange)
-#   Tier 2 (secondary):  yfinance's fast_info quote fields
-#                        (previousClose / lastPrice) -- Yahoo's own
-#                        maintained "live quote" derivation, not
-#                        something we compute ourselves
+#   Tier 2 (secondary):  Yahoo's chart-API meta block
+#                        (chartPreviousClose / regularMarketPrice) --
+#                        values Yahoo states directly, computed on
+#                        their side. NOT yfinance's fast_info, whose
+#                        previousClose is derived client-side from
+#                        hourly bars and was returning the wrong
+#                        session's close for NSE tickers.
 #   Tier 3 (last resort): our own derivation from batched daily +
 #                        intraday candle history, only used if both
 #                        Tier 1 and Tier 2 fail for a symbol
@@ -398,29 +401,98 @@ def fetch_nse_batch(symbols):
     return results, errors
 
 
+YF_CHART_URL = "https://query2.finance.yahoo.com/v8/finance/chart/{ticker}"
+
+YF_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/json,text/plain,*/*",
+}
+
+
 def _fetch_one_yf_quote(ticker):
-    """Single-symbol Yahoo QUOTE fetch via fast_info. Yahoo's own
-    tested/maintained live-quote derivation, not our own candle math."""
+    """TIER 2 -- Yahoo CHART API meta.
+
+    THIS REPLACES THE OLD fast_info CALL, WHICH WAS THE ACTUAL CAUSE OF
+    THE WRONG PREVIOUS CLOSES.
+
+    `fast_info.previousClose` is NOT a raw field off Yahoo's servers.
+    yfinance DERIVES it: it pulls a week of hourly bars (including
+    pre/post-market), groups them by calendar date, and takes the
+    second-to-last day's close. On .NS tickers that grouping regularly
+    lands one session too far back -- which is why FEDERALBNK showed
+    334.50 when the real previous close was 332.75 (live price 331.60
+    was correct, because lastPrice IS a raw field). Every symbol was
+    hitting this because NSE is blocked on Streamlit Cloud, so Tier 2
+    was serving the whole table.
+
+    The chart endpoint's `meta` block instead gives Yahoo's OWN STATED
+    values, computed on their side, no client-side derivation:
+      - chartPreviousClose  -> previous session's official close
+      - regularMarketPrice  -> current live traded price
+    One HTTP request per ticker, fetched concurrently, so it's no
+    slower than fast_info (which also made its own request).
+    """
     try:
-        t = yf.Ticker(ticker)
-        fi = t.fast_info
-        prev_close = fi.get("previousClose") or fi.get("regularMarketPreviousClose")
-        live_price = (
-            fi.get("lastPrice")
-            or fi.get("last_price")
-            or fi.get("regularMarketPrice")
+        resp = requests.get(
+            YF_CHART_URL.format(ticker=ticker),
+            params={"range": "1d", "interval": "1m"},
+            headers=YF_HEADERS,
+            timeout=NSE_REQUEST_TIMEOUT,
         )
+        if resp.status_code != 200:
+            return ticker, None, None, f"HTTP {resp.status_code}"
+
+        payload = resp.json()
+        result = (payload.get("chart", {}).get("result") or [None])[0]
+        if not result:
+            err = payload.get("chart", {}).get("error")
+            return ticker, None, None, f"no result ({err})"
+
+        meta = result.get("meta", {})
+
+        # chartPreviousClose is the previous SESSION's close for the
+        # requested range -- the value we actually want. previousClose
+        # is kept only as a secondary in case the former is absent.
+        prev_close = meta.get("chartPreviousClose") or meta.get("previousClose")
+        live_price = meta.get("regularMarketPrice")
+
+        # If the market is closed / regularMarketPrice is missing, fall
+        # back to the last non-null 1-minute close in the same payload
+        # (same source, same session -- no cross-source reconciliation).
+        if live_price is None:
+            try:
+                closes = result["indicators"]["quote"][0]["close"]
+                for c in reversed(closes):
+                    if c is not None:
+                        live_price = c
+                        break
+            except Exception:
+                pass
+
         if prev_close and live_price:
             return ticker, float(prev_close), float(live_price), None
-        return ticker, None, None, "missing fast_info fields"
+        return ticker, None, None, "missing chart meta fields"
+
+    except ValueError:
+        return ticker, None, None, "non-JSON response"
+    except requests.exceptions.Timeout:
+        return ticker, None, None, "timeout"
     except Exception as e:
         return ticker, None, None, f"{type(e).__name__}"
 
 
 @st.cache_data(ttl=REFRESH_SECONDS, show_spinner=False)
 def fetch_yf_quote_batch(tickers):
-    """TIER 2 (secondary) source, used when NSE fails. Fetches ALL
-    tickers' live quote fields CONCURRENTLY, bounded by ONE timeout."""
+    """TIER 2 (secondary) source, used when NSE fails -- which on
+    Streamlit Cloud is effectively ALWAYS, since NSE blocks datacenter
+    IPs. This tier therefore serves the whole table in practice, so it
+    has to be right: it reads Yahoo's chart-API meta (stated previous
+    close + stated live price), not yfinance's client-side fast_info
+    derivation. Fetches ALL tickers CONCURRENTLY, bounded by ONE
+    timeout."""
     results = {}
     errors = {}
 
@@ -567,7 +639,7 @@ def validate_prev_close(symbol, prev_close, source):
     Streamlit Cloud instance.
 
     NSE's own previousClose and Yahoo's own quote previousClose
-    (Tier 2, "yfinance-quote") are trusted outright and skip the
+    (Tier 2, "yahoo-chart") are trusted outright and skip the
     guard entirely -- they're authoritative values straight from the
     exchange/vendor. The guard only protects the Tier 3
     "yfinance-daily-derived" path, which is the one that derives
@@ -576,7 +648,7 @@ def validate_prev_close(symbol, prev_close, source):
     """
     today_str = datetime.now(ZoneInfo("Asia/Kolkata")).date().isoformat()
 
-    if source in ("NSE", "yfinance-quote"):
+    if source in ("NSE", "yahoo-chart"):
         st.session_state["last_good_prev_close"][symbol] = {
             "date": today_str,
             "value": prev_close,
@@ -648,7 +720,7 @@ for symbol, weight in stocks:
         q_prev, q_live = yf_quote_results.get(ticker, (None, None))
         prev_close = prev_close if prev_close is not None else q_prev
         live_price = live_price if live_price is not None else q_live
-        source = "yfinance-quote"
+        source = "yahoo-chart"
 
     if prev_close is None or live_price is None:
         fb_prev = get_prev_close_from_daily(ticker, daily_batch, intraday_batch)
@@ -957,7 +1029,7 @@ with st.expander("🛠️ Debug: Data source per stock", expanded=False):
             "blocking requests from this host's IP address -- common on "
             "Streamlit Community Cloud. In that case the app runs on "
             "Yahoo's own quote fields instead (Source column shows "
-            "'yfinance-quote'). 'yfinance-daily-derived' means even "
+            "'yahoo-chart'). 'yfinance-daily-derived' means even "
             "Yahoo's quote fields failed for that symbol and it fell "
             "back to candle-derived data, the least reliable tier."
         )
