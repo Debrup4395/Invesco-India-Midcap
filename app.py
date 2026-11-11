@@ -165,16 +165,16 @@ with col_title:
 # MANUAL NAV UPDATE
 # =========================
 
-previous_nav = 244.20
-weekly_start_nav = 240.16
+previous_nav = 240.40
+weekly_start_nav = 240.40
 
 # =========================
 # INVESTMENT DETAILS
 # =========================
 
-avg_nav = 217.10
+avg_nav = 217.10            # TODO: update if your average cost changed
 
-total_units = 990.14
+total_units = 990.14        # TODO: update if your units changed (SWP / redemptions)
 
 total_investment = (
     total_units * avg_nav
@@ -207,56 +207,60 @@ investment_duration = (
 # =========================
 # PORTFOLIO HOLDINGS
 # =========================
-# Invesco India Midcap Fund - Monthly Portfolio Statement as on
-# AUGUST 31, 2026 (equity holdings only; TREPS/Reverse Repo and Net
-# Receivables/(Payables) excluded, since they aren't tradable equity
-# tickers). Same 41 tickers as the July 31 statement; only
-# weights/ranking moved. MANIPALHOS jump (0.51% -> 4.74%) reflects
-# its Aug 5, 2026 NSE listing, not a data error.
+# Invesco India Mid Cap Fund - Monthly Portfolio Statement as on
+# OCTOBER 31, 2026 (equity only; Triparty Repo 0.34% and Net
+# Receivables 0.05% excluded). 41 equity holdings, sum 99.61%.
+#
+# Changes vs. the August 31 list:
+#   NEW:      GROWW (Billionbrains Garage Ventures), PAYTM (One 97
+#             Communications), ZETWERK (Zetwerk Manufacturing Businesses)
+#   REMOVED:  DIXON, VMM (Vishal Mega Mart), SONATSOFTW (Sonata Software)
+# NOTE: "ZETWERK" is my best guess for NSE symbol of ISIN INE09PO01019
+# -- please verify it. The Debug panel will show "no data" if wrong.
 
 stocks = [
 
-    ("PRESTIGE", 7.27),        # Prestige Estates Projects Limited
-    ("MAXHEALTH", 6.50),       # Max Healthcare Institute Limited
-    ("FEDERALBNK", 5.98),      # The Federal Bank Limited
-    ("MEESHO", 4.84),          # Meesho Ltd
-    ("MANIPALHOS", 4.74),      # Manipal Health Enterprises Limited
-    ("MEDANTA", 4.26),         # Global Health Limited
-    ("ETERNAL", 4.20),         # Eternal Limited
-    ("AUBANK", 4.05),          # AU Small Finance Bank Limited
-    ("LTF", 3.97),             # L&T Finance Limited
-    ("INDUSINDBK", 3.92),      # IndusInd Bank Limited
-    ("BSE", 3.22),             # BSE Limited
-    ("SAILIFE", 3.14),         # Sai Life Sciences Limited
-    ("MFSL", 3.07),            # Max Financial Services Limited
-    ("INDIGO", 3.03),          # InterGlobe Aviation Limited
-    ("GLENMARK", 2.91),        # Glenmark Pharmaceuticals Limited
-    ("ABB", 2.86),             # ABB India Limited
-    ("JKCEMENT", 2.56),        # JK Cement Limited
-    ("SRF", 2.27),             # SRF Limited
-    ("CPPLUS", 2.27),          # Aditya Infotech Limited
-    ("NYKAA", 2.21),           # FSN E-Commerce Ventures Limited
-    ("AMBER", 1.96),           # Amber Enterprises India Limited
-    ("BHARATFORG", 1.85),      # Bharat Forge Limited
-    ("TRENT", 1.77),           # Trent Limited
-    ("TORNTPOWER", 1.77),      # Torrent Power Limited
-    ("SWIGGY", 1.48),          # Swiggy Limited
-    ("DIXON", 1.45),           # Dixon Technologies (India) Limited
-    ("TIINDIA", 1.42),         # Tube Investments Of India Limited
-    ("ICICIGI", 1.31),         # ICICI Lombard General Insurance Company Limited
-    ("PHOENIXLTD", 1.15),      # The Phoenix Mills Limited
-    ("CRAFTSMAN", 1.02),       # Craftsman Automation Limited
-    ("ETHOSLTD", 0.96),        # Ethos Ltd.
-    ("KIMS", 0.92),            # Krishna Institute Of Medical Sciences Limited
-    ("CORONA", 0.90),          # Corona Remedies Limited
-    ("AGARWALEYE", 0.73),      # Dr Agarwals Health Care Limited
-    ("TIMKEN", 0.54),          # Timken India Limited
-    ("BANSALWIRE", 0.47),      # Bansal Wire Industries Limited
+    ("MAXHEALTH", 7.86),       # Max Healthcare Institute Limited
+    ("PRESTIGE", 7.65),        # Prestige Estates Projects Limited
+    ("FEDERALBNK", 6.08),      # The Federal Bank Limited
+    ("MEESHO", 5.28),          # Meesho Ltd
+    ("ETERNAL", 4.42),         # Eternal Limited
+    ("MANIPALHOS", 4.18),      # Manipal Health Enterprises Limited
+    ("LTF", 4.15),             # L&T Finance Limited
+    ("AUBANK", 3.95),          # AU Small Finance Bank Limited
+    ("SAILIFE", 3.71),         # Sai Life Sciences Limited
+    ("MEDANTA", 3.67),         # Global Health Limited
+    ("INDUSINDBK", 3.24),      # IndusInd Bank Limited
+    ("INDIGO", 2.84),          # InterGlobe Aviation Limited
+    ("MFSL", 2.74),            # Max Financial Services Limited
+    ("JKCEMENT", 2.72),        # JK Cement Limited
+    ("BHARATFORG", 2.72),      # Bharat Forge Limited
+    ("GLENMARK", 2.66),        # Glenmark Pharmaceuticals Limited
+    ("BSE", 2.65),             # BSE Limited
+    ("ABB", 2.61),             # ABB India Limited
+    ("CPPLUS", 2.44),          # Aditya Infotech Limited
+    ("NYKAA", 2.22),           # FSN E-Commerce Ventures Limited
+    ("SRF", 1.95),             # SRF Limited
+    ("TRENT", 1.87),           # Trent Limited
+    ("TORNTPOWER", 1.72),      # Torrent Power Limited
+    ("AMBER", 1.52),           # Amber Enterprises India Limited
+    ("ICICIGI", 1.51),         # ICICI Lombard General Insurance Company Limited
+    ("GROWW", 1.47),           # Billionbrains Garage Ventures Ltd (NEW)
+    ("ZETWERK", 1.45),         # Zetwerk Manufacturing Businesses Limited (NEW - verify symbol)
+    ("TIINDIA", 1.29),         # Tube Investments Of India Limited
+    ("PHOENIXLTD", 1.19),      # The Phoenix Mills Limited
+    ("CORONA", 0.95),          # Corona Remedies Limited
+    ("CRAFTSMAN", 0.94),       # Craftsman Automation Limited
+    ("SWIGGY", 0.93),          # Swiggy Limited
+    ("PAYTM", 0.90),           # One 97 Communications Limited (NEW)
+    ("KIMS", 0.86),            # Krishna Institute Of Medical Sciences Limited
+    ("ETHOSLTD", 0.83),        # Ethos Ltd.
+    ("AGARWALEYE", 0.72),      # Dr Agarwals Health Care Limited
+    ("TIMKEN", 0.49),          # Timken India Limited
     ("MAXESTATES", 0.43),      # Max Estates Limited
-    ("WEWORK", 0.37),          # Wework India Management Limited
-    ("VMM", 0.18),             # Vishal Mega Mart Limited
-    ("CARBORUNIV", 0.09),      # Carborundum Universal Limited
-    ("SONATSOFTW", 0.07),      # Sonata Software Limited
+    ("BANSALWIRE", 0.43),      # Bansal Wire Industries Limited
+    ("WEWORK", 0.35),          # Wework India Management Limited
+    ("CARBORUNIV", 0.02),      # Carborundum Universal Limited
 
 ]
 
@@ -264,43 +268,16 @@ stocks = [
 # FETCH LIVE DATA
 # =========================
 #
-# WHY PRICES WERE WRONG IN THE OLD VERSION:
-#
-# The old fetch did ONE batched yf.download(period="10d", interval="1d")
-# call and nothing else. That only ever returns DAILY BARS. During
-# market hours, "today's" daily bar for an NSE ticker frequently isn't
-# updated intraday the way a live quote is -- so "Live Price" was
-# regularly just showing yesterday's (or an even older) daily close,
-# not the actual current traded price. There was no live/intraday
-# source at all, unlike the sister Motilal Oswal tracker, which is why
-# that one moves correctly and this one didn't.
-#
-# FIX -- adopt the same 3-tier fetch used by the Motilal Oswal tracker,
-# which IS producing correct live movement:
-#
-#   Tier 1 (primary):   NSE's own quote API (previousClose + lastPrice,
-#                        both authoritative, straight from the exchange)
-#   Tier 2 (secondary):  Yahoo's chart-API meta block
-#                        (chartPreviousClose / regularMarketPrice) --
-#                        values Yahoo states directly, computed on
-#                        their side. NOT yfinance's fast_info, whose
-#                        previousClose is derived client-side from
-#                        hourly bars and was returning the wrong
-#                        session's close for NSE tickers.
-#   Tier 3 (last resort): our own derivation from batched daily +
-#                        intraday candle history, only used if both
-#                        Tier 1 and Tier 2 fail for a symbol
-#
-# All three tiers are fetched CONCURRENTLY across all symbols, each
-# bounded by its own hard timeout, and the per-symbol loop that builds
-# the table does ZERO network I/O -- it only reads from the pre-fetched
-# batches. This is the same pattern that fixed both the "frozen page"
-# and "wrong price" bugs on the Motilal tracker.
-#
-# A staleness guard (keyed by symbol+date, so it resets every trading
-# day) still protects ONLY the Tier 3 derived path, since Tier 1/2 are
-# authoritative exchange/vendor quotes with nothing to validate them
-# against.
+# Three-tier fetch, all tiers fetched CONCURRENTLY with hard timeouts;
+# the per-symbol loop below does ZERO network I/O.
+#   Tier 1: NSE quote API (previousClose + lastPrice)
+#   Tier 2: Yahoo chart-API meta (chartPreviousClose / regularMarketPrice)
+#           -- Yahoo's own stated values, NOT yfinance fast_info, whose
+#           previousClose is derived client-side and was wrong for .NS
+#   Tier 3: own derivation from batched daily + intraday candles
+#           (last resort only)
+# The staleness guard is keyed by (symbol, date) and protects ONLY the
+# Tier 3 derived path.
 
 STALE_GUARD_PCT = 3.0     # max allowed jump in previous_close vs last known-good, in % (Tier 3 only)
 NSE_REQUEST_TIMEOUT = 5   # per-request timeout, seconds
@@ -311,8 +288,7 @@ if "last_good_data" not in st.session_state:
     st.session_state["last_good_data"] = {}
 
 if "last_good_prev_close" not in st.session_state:
-    # {symbol: {"date": "YYYY-MM-DD", "value": float}} -- staleness
-    # guard baseline, used only for the Tier 3 derived path.
+    # {symbol: {"date": "YYYY-MM-DD", "value": float}}
     st.session_state["last_good_prev_close"] = {}
 
 if "nse_session" not in st.session_state:
@@ -413,28 +389,9 @@ YF_HEADERS = {
 
 
 def _fetch_one_yf_quote(ticker):
-    """TIER 2 -- Yahoo CHART API meta.
-
-    THIS REPLACES THE OLD fast_info CALL, WHICH WAS THE ACTUAL CAUSE OF
-    THE WRONG PREVIOUS CLOSES.
-
-    `fast_info.previousClose` is NOT a raw field off Yahoo's servers.
-    yfinance DERIVES it: it pulls a week of hourly bars (including
-    pre/post-market), groups them by calendar date, and takes the
-    second-to-last day's close. On .NS tickers that grouping regularly
-    lands one session too far back -- which is why FEDERALBNK showed
-    334.50 when the real previous close was 332.75 (live price 331.60
-    was correct, because lastPrice IS a raw field). Every symbol was
-    hitting this because NSE is blocked on Streamlit Cloud, so Tier 2
-    was serving the whole table.
-
-    The chart endpoint's `meta` block instead gives Yahoo's OWN STATED
-    values, computed on their side, no client-side derivation:
-      - chartPreviousClose  -> previous session's official close
-      - regularMarketPrice  -> current live traded price
-    One HTTP request per ticker, fetched concurrently, so it's no
-    slower than fast_info (which also made its own request).
-    """
+    """TIER 2 -- Yahoo CHART API meta (chartPreviousClose +
+    regularMarketPrice), values Yahoo states directly rather than
+    values derived client-side from candle history."""
     try:
         resp = requests.get(
             YF_CHART_URL.format(ticker=ticker),
@@ -453,15 +410,11 @@ def _fetch_one_yf_quote(ticker):
 
         meta = result.get("meta", {})
 
-        # chartPreviousClose is the previous SESSION's close for the
-        # requested range -- the value we actually want. previousClose
-        # is kept only as a secondary in case the former is absent.
         prev_close = meta.get("chartPreviousClose") or meta.get("previousClose")
         live_price = meta.get("regularMarketPrice")
 
-        # If the market is closed / regularMarketPrice is missing, fall
-        # back to the last non-null 1-minute close in the same payload
-        # (same source, same session -- no cross-source reconciliation).
+        # Market closed / regularMarketPrice missing -> last non-null
+        # 1-minute close from the same payload.
         if live_price is None:
             try:
                 closes = result["indicators"]["quote"][0]["close"]
@@ -487,12 +440,8 @@ def _fetch_one_yf_quote(ticker):
 @st.cache_data(ttl=REFRESH_SECONDS, show_spinner=False)
 def fetch_yf_quote_batch(tickers):
     """TIER 2 (secondary) source, used when NSE fails -- which on
-    Streamlit Cloud is effectively ALWAYS, since NSE blocks datacenter
-    IPs. This tier therefore serves the whole table in practice, so it
-    has to be right: it reads Yahoo's chart-API meta (stated previous
-    close + stated live price), not yfinance's client-side fast_info
-    derivation. Fetches ALL tickers CONCURRENTLY, bounded by ONE
-    timeout."""
+    Streamlit Cloud is effectively always, since NSE blocks datacenter
+    IPs. Fetches ALL tickers CONCURRENTLY, bounded by ONE timeout."""
     results = {}
     errors = {}
 
@@ -567,14 +516,12 @@ def fetch_intraday_batch(tickers):
 
 
 def get_prev_close_from_daily(ticker, daily_batch, intraday_batch):
-    """Previous close = last COMPLETE daily bar, pulled from the
-    pre-fetched daily batch. No network I/O.
+    """Previous close = last COMPLETE daily bar, from the pre-fetched
+    daily batch. No network I/O.
 
     Decides whether the last daily row is "today's still-forming bar"
     by comparing it against yfinance's OWN intraday bar dates (same
-    source/normalization as the daily bars), rather than against a
-    separately-computed Python-clock date -- avoids the two sources of
-    "what day is it" disagreeing with each other.
+    source/normalization), not a separately computed Python-clock date.
     """
     try:
         if daily_batch is None or daily_batch.empty:
@@ -615,10 +562,8 @@ def get_prev_close_from_daily(ticker, daily_batch, intraday_batch):
 
 
 def get_live_price_from_intraday(ticker, batch_data):
-    """Live price = most recent 1-minute intraday close, pulled from
-    the pre-fetched intraday batch. No network I/O. Falls back to the
-    daily batch's last close if intraday data is unavailable (e.g.
-    market closed)."""
+    """Live price = most recent 1-minute intraday close, from the
+    pre-fetched intraday batch. No network I/O."""
     try:
         if batch_data is not None and not batch_data.empty:
             if isinstance(batch_data.columns, pd.MultiIndex):
@@ -635,16 +580,8 @@ def get_live_price_from_intraday(ticker, batch_data):
 def validate_prev_close(symbol, prev_close, source):
     """
     STALENESS GUARD -- keyed by (symbol, date) so the baseline resets
-    every trading day instead of persisting indefinitely on a warm
-    Streamlit Cloud instance.
-
-    NSE's own previousClose and Yahoo's own quote previousClose
-    (Tier 2, "yahoo-chart") are trusted outright and skip the
-    guard entirely -- they're authoritative values straight from the
-    exchange/vendor. The guard only protects the Tier 3
-    "yfinance-daily-derived" path, which is the one that derives
-    previous-close from historical candles ourselves and can
-    occasionally land on a bad bar.
+    every trading day. NSE and Yahoo-chart values are trusted outright;
+    the guard only protects the Tier 3 candle-derived path.
     """
     today_str = datetime.now(ZoneInfo("Asia/Kolkata")).date().isoformat()
 
