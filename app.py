@@ -796,6 +796,9 @@ unrealised_pl_amount = (
     / 100
 )
 
+# Current portfolio value = estimated NAV x units held
+portfolio_value = estimated_nav * total_units
+
 # =========================
 # TOP 5 GAINERS & LOSERS
 # =========================
@@ -886,6 +889,28 @@ col7.metric(
     "💼 Unrealised P/L",
     f"₹{unrealised_pl_amount:,.0f}",
     f"{unrealised_pl_pct:.2f}%"
+)
+
+st.markdown("---")
+
+# =========================
+# PORTFOLIO VALUE
+# =========================
+
+col_pv1, col_pv2 = st.columns(2)
+
+# Streamlit colours the delta by its leading "-", so put the sign before the ₹
+pv_sign = "-" if daily_return_amount < 0 else ""
+
+col_pv1.metric(
+    "🏦 Portfolio Value",
+    f"₹{portfolio_value:,.0f}",
+    f"{pv_sign}₹{abs(daily_return_amount):,.0f} today"
+)
+
+col_pv2.metric(
+    "📥 Total Invested",
+    f"₹{total_investment:,.0f}"
 )
 
 st.markdown("---")
@@ -1000,6 +1025,8 @@ message_content = f"""
 • Daily Change: {total_weighted_return:.2f}%
 
 💰 Returns:
+• Portfolio Value: ₹{portfolio_value:,.0f}
+• Invested Amount: ₹{total_investment:,.0f}
 • Daily Return: ₹{daily_return_amount:,.0f}
 • Weekly Return: ₹{weekly_return_amount:,.0f}
 • Unrealised P/L: ₹{unrealised_pl_amount:,.0f} ({unrealised_pl_pct:.2f}%)
