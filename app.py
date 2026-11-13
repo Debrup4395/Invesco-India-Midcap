@@ -172,7 +172,7 @@ weekly_start_nav = 240.40
 # INVESTMENT DETAILS
 # =========================
 
-avg_nav = 217.10            # TODO: update if your average cost changed
+avg_nav = 218.28            # FIFO average cost after 12 Nov 2026 withdrawal (Rs 28,000 @ 247.90)
 
 total_units = 681.3863        # TODO: update if your units changed (SWP / redemptions)
 
