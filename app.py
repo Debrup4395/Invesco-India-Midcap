@@ -1145,4 +1145,4 @@ st.dataframe(
 
 st.markdown("---")
 
-st.caption(f"© Debrup Bera | Auto-refresh every {REFRESH_SECONDS} seconds")hey claude add portfolio value also
+st.caption(f"© Debrup Bera | Auto-refresh every {REFRESH_SECONDS} seconds")
