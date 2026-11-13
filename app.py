@@ -174,7 +174,7 @@ weekly_start_nav = 240.40
 
 avg_nav = 217.10            # TODO: update if your average cost changed
 
-total_units = 794.3351        # TODO: update if your units changed (SWP / redemptions)
+total_units = 921.4897        # TODO: update if your units changed (SWP / redemptions)
 
 total_investment = (
     total_units * avg_nav
